@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="291afdce-ae85-4bcf-96bd-0067780b9075" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="f30e5c6f-9fbd-4319-adab-167eff770355" >
+		<salesforce:basic-connection username="bhalaji@hashedinbydeloitte.sandbox" password="Bingoo@951" securityToken="5nMsO1gQGN2V9S8zvn3j0Z5Y" />
+	</salesforce:sfdc-config>
+	<http:listener-config name="HTTP_Listener_config1" doc:name="HTTP Listener config" doc:id="d4775272-43c5-4b51-aa8e-8d6877a6957a" >
+		<http:listener-connection host="0.0.0.0" port="8082" />
+	</http:listener-config>
+	<http:listener-config name="HTTP_Listener_config2" doc:name="HTTP Listener config" doc:id="16863573-e944-4f5e-90fd-cc2221cd7775" >
+		<http:listener-connection host="0.0.0.0" port="8083" />
+	</http:listener-config>
+	<http:listener-config name="HTTP_Listener_config3" doc:name="HTTP Listener config" doc:id="0536dea5-469c-4c71-b022-b4411f3f5223" >
+		<http:listener-connection host="0.0.0.0" port="8084" />
+	</http:listener-config>
+	<http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="dabb5f41-9525-44e7-b414-76d88896bed5">
+		<http:request-connection host="localhost" port="8084" connectionIdleTimeout="60000">
+			<reconnection >
+				<reconnect />
+			</reconnection>
+		</http:request-connection>
+	</http:request-config>
+	<http:listener-config name="HTTP_Listener_config4" doc:name="HTTP Listener config" doc:id="1b64455f-730f-4d4a-a458-da9aada78d09" >
+		<http:listener-connection host="0.0.0.0" port="8085" />
+	</http:listener-config>
+	<flow name="salesforcecrudFlow" doc:id="23d3d24e-546b-4b7f-bfd1-6c38c30c07ff" >
+		<http:listener doc:name="Listener" doc:id="048de2fe-0279-4622-99b4-6e91340ba004" config-ref="HTTP_Listener_config" path="/create" outputMimeType="application/json"/>
+		<salesforce:create doc:name="createRecord" doc:id="94d8d174-23f3-4d85-bd38-a3d6277cd751" config-ref="Salesforce_Config" type="HashedinEmployeeData__c" />
+		<choice doc:name="Check if Record is created or not" doc:id="f3b62cb3-ac19-4e23-a820-42df75c64f80" >
+			<when expression="#[payload.successful == true]">
+				<ee:transform doc:name="recordCreated" doc:id="f1d30d05-0b3d-4ca1-897e-68cb350b0025" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"id" : payload.items.payload.id[0],
+	"message": payload.items.payload,
+	"successful" : payload.items.successful,
+	"statusCode" : payload .items.statusCode
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</when>
+			<otherwise>
+				<ee:transform doc:name="errorResponse" doc:id="2c78a1af-d1dc-41c4-8b51-c5b576ecf912" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message" : payload.items.message,
+	"statusCode" : payload .items.statusCode,
+	"errors" : payload.items.payload.errors,
+	"success" : payload.successful
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+	</flow>
+	<flow name="salesforcecrudFlow1" doc:id="b3453efa-276e-435f-ac06-f9b269e05080" >
+		<http:listener doc:name="Listener" doc:id="b04715cb-d6a3-44a7-ae8d-90f23fcc8e48" config-ref="HTTP_Listener_config1" path="/delete"/>
+		<salesforce:delete doc:name="deleteRecord" doc:id="aa1f66ab-e8bd-4d73-9910-ebf70473cabb" config-ref="Salesforce_Config">
+			<salesforce:ids ><![CDATA[#[payload.id]]]></salesforce:ids>
+		</salesforce:delete>
+		<choice doc:name="Check if Record Deleted or Not" doc:id="cddc3169-6865-4788-a739-e905b41fab0e" >
+			<when expression="#[payload.successful != false]">
+				<ee:transform doc:name="deletedRecord" doc:id="1f4f6ee8-e69a-4746-adf5-2c74f7cf599a">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message" : "Record Deleted Successfully!"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+			</when>
+			<otherwise >
+				<ee:transform doc:name="errorResponse" doc:id="fd199c00-1d16-4436-b60b-9b875f3f34c5" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message" : payload.items.message,
+	"statusCode" : payload .items.statusCode,
+	"errors" : payload.items.payload.errors,
+	"success" : payload.successful
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+	</flow>
+	<flow name="salesforcecrudFlow2" doc:id="229187da-0094-450d-98c7-5f5082136917" >
+		<http:listener doc:name="Listener" doc:id="1ee2ea26-fe2f-4521-8f9c-05355f4ec46c" path="/update" config-ref="HTTP_Listener_config2"/>
+		<salesforce:update doc:name="Update" doc:id="2f793c3a-e754-4b95-bd9e-f630ceb7ff94" config-ref="Salesforce_Config" type="HashedinEmployeeData__c" />
+		<choice doc:name="Choice" doc:id="4995e446-715d-4a95-a7c1-82f684a2ec41" >
+			<when expression="#[payload.successful == true]">
+				<ee:transform doc:name="Updated Record" doc:id="fc3fd329-171e-446f-90f7-618a10641f68" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"Id" : payload.items.id,
+	"message" : "Updated Record Successfully",
+	"success" : payload.successful
+}
+]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</when>
+			<otherwise >
+				<ee:transform doc:name="Transform Message" doc:id="f42ed9ee-ef90-41d1-8559-d718a64f29db" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message" : "Record Not Exits!"
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+	</flow>
+	<flow name="salesforcecrudFlow3" doc:id="534064f7-7147-4546-b9c3-1d24518d8474" >
+		<http:listener doc:name="Listener" doc:id="ab5c2efc-0721-451c-bb15-f20dbaa57b34" config-ref="HTTP_Listener_config3" path="/get"/>
+		<salesforce:query doc:name="Query Record" doc:id="4b3d7ef9-c0b3-4190-bb60-f02d00d2a911" config-ref="Salesforce_Config">
+			<salesforce:salesforce-query><![CDATA[SELECT Id,Name, FullName__c, JobTitle__c, Department__c, DateofJoining__c, ContactNumber__c, Email__c
+FROM HashedinEmployeeData__c Where Id = ':Id' ]]></salesforce:salesforce-query>
+			<salesforce:parameters><![CDATA[#[{
+	"Id" :payload.Id
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<ee:transform doc:name="Success Response" doc:id="f39d7dab-6b4d-49c3-a99a-aca080f9181c">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="salesforcecrudFlow4" doc:id="c1714ece-0674-4eae-a16b-849da0e69b45" >
+		<http:listener doc:name="Listener" doc:id="c177df1d-1591-4329-a27f-922dc1692d97" config-ref="HTTP_Listener_config4" path="/bulk" />
+		<salesforce:query doc:name="getAllRecords" doc:id="1258cc05-8bd9-4d38-8f4d-9d2f8dd1e429" config-ref="Salesforce_Config" >
+			<salesforce:salesforce-query ><![CDATA[SELECT Id,Name, FullName__c, JobTitle__c, Department__c, DateofJoining__c, ContactNumber__c, Email__c
+FROM HashedinEmployeeData__c LIMIT 3 OFFSET 1]]></salesforce:salesforce-query>
+		</salesforce:query>
+		<ee:transform doc:name="successResponse" doc:id="36860550-4e16-4f1e-a0e5-981d0cfd6f07" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>
